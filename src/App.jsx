@@ -177,13 +177,13 @@ const NavDrawer = ({ isOpen, onClose, activeTab, setActiveTab, stickyNote, setSt
 const HelpModal = ({ isOpen, onClose, activeTab }) => {
   if (!isOpen) return null;
   const content = {
-    journey: { title: "Jurnal Petualangan Kita", text: "Di sini gudangnya rencana kencan kita. Kalau udah terlaksana, jangan lupa klik tombol kamera buat simpan bukti kenangan. Kalau bingung mau ke mana, klik tombol acak aja biar takdir yang milihin. Cek hitung mundur kalau udah janjian!" },
-    timer: { title: "Waktu Bersama", text: "Ini bukti seberapa lama kamu betah sama aku. Hitungan ini jalan terus sejak 17 Oktober 2025. Semoga angkanya nambah terus sampai kita jadi kakek nenek ya!" },
-    deeptalk: { title: "Bicara Dari Hati", text: "Kocok kartunya, jawab jujur, dan tatap mata aku pas jawab. Awas jangan baper duluan!" },
+    journey: { title: "Jurnal Petualangan Kita", text: "Welcome to our gallery date yaw, ahahha. Di sini gudangnya rencana date kita. Kalau udah terlaksana, jangan lupa klik tombol kamera buat simpan bukti kenangan. Kalau bingung mau ke mana, klik tombol acak aja biar takdir yang milihin. Cek hitung mundur kalau udah janjian!. Ada grid mode instragram juga sama ada mode timelien buat liat date yg udh kita capaii" },
+    timer: { title: "Waktu Bersama", text: "Ini bukti seberapa lama kamu betah sama aku, asekk. Hitungan ini jalan terus sejak 17 Oktober 2025. Semoga angkanya nambah terus sampai kita jadi kakek nenek ya!" },
+    deeptalk: { title: "Bicara Dari Hati", text: "Kocok kartunya, jawab jujur, dan jangan ada dusta diantara kita. Awas jangan baper duluan!" },
     capsule: { title: "Pesan Masa Depan", text: "Tulis surat di sini, terus kunci. Kita buka bareng-bareng nanti pas tanggalnya tiba. Inget, gak boleh diintip kuncinya!" },
-    tickets: { title: "Hadiah Cintaku", text: "Tiap 3 kencan selesai, kamu dapet 1 Tiket Cinta! Tukerin tiketnya sama voucher 'Menang Debat' atau pijat gratis." },
+    tickets: { title: "Hadiah Cintaku", text: "Tiap 3 date selesai, kamu dapet 1 Tiket Qpon, ehh engga deh tapi tiket ini bisa ditukerin sama voucher yg ga kalah menarikk" },
     outfit: { title: "Cocoklogi Baju", text: "Bingung mau pake baju warna apa? Pilih warna di sini pakai color picker yang bulet itu biar kita match! Tulis juga jenisnya (kemeja/gamis) biar makin jelas. Kalau udah sepakat, klik kunci ya." },
-    pms: { title: "Sistem Peringatan Dini", text: "Fitur penyelamat nyawa! Set tanggal mulai dan akhir haid kamu di sini. Nanti kalender bakal merah dan ada running text di atas kalau masuk zona bahaya, biar aku siap mental." }
+    pms: { title: "Sistem Peringatan Dini", text: "Fitur penyelamat nyawa! Set tanggal mulai dan akhir haid kamu di sini. Nanti kalender bakal merah dan ada running text di atas kalau masuk zona bahaya, biar aku siap mentall :D." }
   };
   const currentHelp = content[activeTab] || content['journey'];
   return (
