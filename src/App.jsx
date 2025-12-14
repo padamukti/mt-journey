@@ -4,7 +4,7 @@ import {
   Menu, Shuffle, MessageCircleHeart, Timer, 
   Calendar, Plus, Lock, Unlock, Play, Pause,
   Ticket, LayoutGrid, List, Trash2, ChevronDown, ChevronUp, User, Star, Gift, HelpCircle,
-  Bell, Shirt, Droplet, AlertTriangle, Upload
+  Bell, Shirt, Droplet, AlertTriangle, Upload, Send // <--- Tambahkan Send di sini
 } from 'lucide-react';
 
 // Import Firebase
@@ -74,9 +74,19 @@ const features = [
 
 // --- COMPONENTS ---
 
+// 1. Navigation Drawer (FIX: Sticky Note dengan Tombol Kirim)
 const NavDrawer = ({ isOpen, onClose, activeTab, setActiveTab, stickyNote, setStickyNote, progress, triggerAnnoyance }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false); 
+  // State lokal untuk sticky note agar ngetik tidak lag
+  const [localNote, setLocalNote] = useState(stickyNote);
+  
+  // Sinkronisasi data lokal jika ada update baru dari pasangan (Database)
+  useEffect(() => {
+    setLocalNote(stickyNote);
+  }, [stickyNote]);
+
+  // Audio Ref
   const audioRef = useRef(new Audio('music-jazz.MP3')); 
 
   const toggleMusic = () => {
@@ -90,6 +100,11 @@ const NavDrawer = ({ isOpen, onClose, activeTab, setActiveTab, stickyNote, setSt
       }
     }
     setIsPlaying(!isPlaying);
+  };
+
+  const handleSendNote = () => {
+    setStickyNote(localNote); // Kirim ke Firebase
+    alert("Pesan terkirim ke pasangan! ❤️");
   };
 
   const currentFeatureLabel = features.find(f => f.id === activeTab)?.label || "Menu Fitur";
@@ -119,9 +134,24 @@ const NavDrawer = ({ isOpen, onClose, activeTab, setActiveTab, stickyNote, setSt
                       <button onClick={toggleMusic} className="w-10 h-10 bg-white text-rose-900 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-md">{isPlaying ? <Pause size={16} fill="currentColor"/> : <Play size={16} fill="currentColor" className="ml-0.5"/>}</button>
                   </div>
                </div>
+               
+               {/* FIX: Sticky Note dengan Tombol Kirim */}
                <div className="bg-[#fff9c4] p-5 rounded-2xl shadow-sm relative transform rotate-1 hover:rotate-0 transition-transform duration-300 border border-[#fff59d]">
-                  <h4 className="text-xs font-bold text-yellow-800 uppercase mb-3 flex items-center gap-2"><Sparkles size={12}/> Mood Check-in</h4>
-                  <textarea value={stickyNote} onChange={(e) => setStickyNote(e.target.value)} className="w-full bg-transparent text-sm text-gray-700 font-medium resize-none focus:outline-none leading-relaxed" rows="3" placeholder="Tulis pesan manis..." style={{ fontFamily: 'cursive' }} />
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-xs font-bold text-yellow-800 uppercase flex items-center gap-2"><Sparkles size={12}/> Mood Check-in</h4>
+                    <button onClick={handleSendNote} className="bg-yellow-600 text-white p-1.5 rounded-full hover:bg-yellow-700 transition-colors" title="Kirim ke Pasangan">
+                      <Send size={12} />
+                    </button>
+                  </div>
+                  <textarea 
+                    value={localNote} 
+                    onChange={(e) => setLocalNote(e.target.value)} 
+                    className="w-full bg-transparent text-sm text-gray-700 font-medium resize-none focus:outline-none leading-relaxed" 
+                    rows="3" 
+                    placeholder="Tulis pesan manis..." 
+                    style={{ fontFamily: 'cursive' }} 
+                  />
+                  <p className="text-[10px] text-yellow-700/60 text-right mt-1">*Klik ikon pesawat untuk update</p>
                </div>
             </div>
             <div className="mt-6 border-t border-rose-100 pt-4 relative">
@@ -218,8 +248,11 @@ export default function App() {
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
-  const [capsuleEmip, setCapsuleEmip] = useState(() => { const s = localStorage.getItem('capsule-emip'); return s ? JSON.parse(s) : { msg: '', date: '', isLocked: false }; });
-  const [capsuleAzil, setCapsuleAzil] = useState(() => { const s = localStorage.getItem('capsule-azil'); return s ? JSON.parse(s) : { msg: '', date: '', isLocked: false }; });
+  // Capsule State (Sekarang dikontrol Firebase)
+  const [capsuleEmip, setCapsuleEmip] = useState({ id: 'emip', msg: '', date: '', isLocked: false });
+  const [capsuleAzil, setCapsuleAzil] = useState({ id: 'azil', msg: '', date: '', isLocked: false });
+  // const [capsuleEmip, setCapsuleEmip] = useState(() => { const s = localStorage.getItem('capsule-emip'); return s ? JSON.parse(s) : { msg: '', date: '', isLocked: false }; });
+  // const [capsuleAzil, setCapsuleAzil] = useState(() => { const s = localStorage.getItem('capsule-azil'); return s ? JSON.parse(s) : { msg: '', date: '', isLocked: false }; });
 
   // SYNC LOCALSTORAGE
   useEffect(() => {
@@ -227,8 +260,8 @@ export default function App() {
      localStorage.setItem('mt-pms-v3', JSON.stringify(pmsData));
      localStorage.setItem('mt-sticky', stickyNote);
      localStorage.setItem('mt-plan-v6', JSON.stringify(activeDatePlan));
-     localStorage.setItem('capsule-emip', JSON.stringify(capsuleEmip));
-     localStorage.setItem('capsule-azil', JSON.stringify(capsuleAzil));
+     //localStorage.setItem('capsule-emip', JSON.stringify(capsuleEmip));
+     //localStorage.setItem('capsule-azil', JSON.stringify(capsuleAzil));
   }, [outfit, pmsData, stickyNote, activeDatePlan, capsuleEmip, capsuleAzil]);
 
   // --- FIREBASE SYNC ---
@@ -294,6 +327,23 @@ export default function App() {
         }
     });
 
+    // 5. Sync Time Capsule (NEW: Menggunakan Firebase)
+    const unsubCapsuleEmip = onSnapshot(doc(db, "capsules", "emip"), (docSnap) => {
+        if (docSnap.exists()) setCapsuleEmip({ id: docSnap.id, ...docSnap.data() });
+    });
+    const unsubCapsuleAzil = onSnapshot(doc(db, "capsules", "azil"), (docSnap) => {
+        if (docSnap.exists()) setCapsuleAzil({ id: docSnap.id, ...docSnap.data() });
+    });
+
+    // Inisialisasi data (Jika belum ada di Firebase)
+    setDoc(doc(db, "capsules", "emip"), { msg: '', date: '', isLocked: false }, { merge: true });
+    setDoc(doc(db, "capsules", "azil"), { msg: '', date: '', isLocked: false }, { merge: true });
+
+    return () => { 
+        unsubDates(); unsubQuestions(); unsubVouchers(); unsubAppState(); 
+        unsubCapsuleEmip(); unsubCapsuleAzil(); // Tambahkan cleanup ini
+    };
+
     return () => { unsubDates(); unsubQuestions(); unsubVouchers(); unsubAppState(); };
   }, []);
 
@@ -316,6 +366,11 @@ export default function App() {
   const handleStickyChange = (val) => {
       setStickyNoteState(val);
       updateFirebaseState('stickyNote', val);
+  };
+
+  const updateCapsule = async (target, data) => {
+      // Data target harus 'emip' atau 'azil'
+      await setDoc(doc(db, "capsules", target), data, { merge: true });
   };
 
   const triggerAnnoyance = async () => { await updateFirebaseState('annoyanceTriggered', true); };
@@ -562,33 +617,35 @@ export default function App() {
         )}
         
         {/* OTHER TABS (OUTFIT, PMS, ETC) MAPPED SAME AS PREVIOUS CODE */}
+
+        
         {activeTab === 'outfit' && (
-          <div className="max-w-3xl mx-auto py-10 animate-fade-in text-center">
-             <h2 className="text-4xl font-serif font-bold text-rose-950 mb-10">Outfit Matcher</h2>
-             <div className="flex flex-col md:flex-row gap-6 justify-center items-start mb-10">
-                <div className="bg-white/80 p-8 rounded-[2rem] shadow-xl w-full max-w-xs">
-                   <h3 className="font-bold text-blue-900 text-xl mb-6">Miftah</h3>
-                   <div className="space-y-4">
-                      <div className="flex items-center gap-4"><span className="text-xs font-bold w-16">Atasan</span><div className="h-10 flex-1 rounded-xl shadow-inner border border-gray-200" style={{backgroundColor: outfit.miftah?.top || '#FFF'}}></div>{!outfit.locked && <input type="color" value={outfit.miftah?.top || '#FFFFFF'} onChange={(e) => handleOutfitChange({...outfit, miftah: {...outfit.miftah, top: e.target.value}})} />}</div>
-                      <input type="text" placeholder="(contoh: kemeja)" value={outfit.miftah?.topText || ''} onChange={(e) => handleOutfitChange({...outfit, miftah: {...outfit.miftah, topText: e.target.value}})} className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300"/>
-                      <div className="flex items-center gap-4"><span className="text-xs font-bold w-16">Bawahan</span><div className="h-10 flex-1 rounded-xl shadow-inner border border-gray-200" style={{backgroundColor: outfit.miftah?.bot || '#000'}}></div>{!outfit.locked && <input type="color" value={outfit.miftah?.bot || '#000000'} onChange={(e) => handleOutfitChange({...outfit, miftah: {...outfit.miftah, bot: e.target.value}})} />}</div>
-                      <input type="text" placeholder="(contoh: celana)" value={outfit.miftah?.botText || ''} onChange={(e) => handleOutfitChange({...outfit, miftah: {...outfit.miftah, botText: e.target.value}})} className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-300"/>
-                   </div>
-                </div>
-                <div className="self-center bg-rose-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg z-10 font-bold text-xl my-4 md:my-0"><Plus size={24}/></div>
-                <div className="bg-white/80 p-8 rounded-[2rem] shadow-xl w-full max-w-xs">
-                   <h3 className="font-bold text-pink-900 text-xl mb-6">Tanzil</h3>
-                   <div className="space-y-4">
-                      <div className="flex items-center gap-4"><span className="text-xs font-bold w-16">Atasan</span><div className="h-10 flex-1 rounded-xl shadow-inner border border-gray-200" style={{backgroundColor: outfit.tanzil?.top || '#FFF'}}></div>{!outfit.locked && <input type="color" value={outfit.tanzil?.top || '#FFFFFF'} onChange={(e) => handleOutfitChange({...outfit, tanzil: {...outfit.tanzil, top: e.target.value}})} />}</div>
-                      <input type="text" placeholder="(contoh: dress)" value={outfit.tanzil?.topText || ''} onChange={(e) => handleOutfitChange({...outfit, tanzil: {...outfit.tanzil, topText: e.target.value}})} className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
-                      <div className="flex items-center gap-4"><span className="text-xs font-bold w-16">Bawahan</span><div className="h-10 flex-1 rounded-xl shadow-inner border border-gray-200" style={{backgroundColor: outfit.tanzil?.bot || '#000'}}></div>{!outfit.locked && <input type="color" value={outfit.tanzil?.bot || '#000000'} onChange={(e) => handleOutfitChange({...outfit, tanzil: {...outfit.tanzil, bot: e.target.value}})} />}</div>
-                      <input type="text" placeholder="(contoh: rok)" value={outfit.tanzil?.botText || ''} onChange={(e) => handleOutfitChange({...outfit, tanzil: {...outfit.tanzil, botText: e.target.value}})} className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-pink-300"/>
-                   </div>
-                </div>
-             </div>
-             <button onClick={() => handleOutfitChange({...outfit, locked: !outfit.locked})} className={`px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 ${outfit.locked ? 'bg-gray-800 text-white' : 'bg-rose-500 text-white'}`}>{outfit.locked ? <span className="flex items-center gap-2"><Lock size={18}/> Sudah Disepakati</span> : <span className="flex items-center gap-2"><Unlock size={18}/> Kunci Pilihan</span>}</button>
-          </div>
-        )}
+                  <div className="max-w-3xl mx-auto py-10 animate-fade-in text-center">
+                     <h2 className="text-4xl font-serif font-bold text-rose-950 mb-10">Outfit Matcher</h2>
+                     <div className="flex flex-col md:flex-row gap-6 justify-center items-start mb-10">
+                        <div className="bg-white/80 p-8 rounded-[2rem] shadow-xl w-full max-w-xs">
+                           <h3 className="font-bold text-blue-900 text-xl mb-6">Miftah</h3>
+                           <div className="space-y-4">
+                              <div className="flex items-center gap-4"><span className="text-xs font-bold w-16">Atasan</span><div className="h-10 flex-1 rounded-xl shadow-inner border border-gray-200" style={{backgroundColor: outfit.miftah?.top || '#FFF'}}></div>{!outfit.locked && <input type="color" value={outfit.miftah?.top || '#FFFFFF'} onChange={(e) => handleOutfitChange({...outfit, miftah: {...outfit.miftah, top: e.target.value}})} />}</div>
+                              <input type="text" placeholder="(contoh: kemeja)" value={outfit.miftah?.topText || ''} onChange={(e) => handleOutfitChange({...outfit, miftah: {...outfit.miftah, topText: e.target.value}})} className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+                              <div className="flex items-center gap-4"><span className="text-xs font-bold w-16">Bawahan</span><div className="h-10 flex-1 rounded-xl shadow-inner border border-gray-200" style={{backgroundColor: outfit.miftah?.bot || '#000'}}></div>{!outfit.locked && <input type="color" value={outfit.miftah?.bot || '#000000'} onChange={(e) => handleOutfitChange({...outfit, miftah: {...outfit.miftah, bot: e.target.value}})} />}</div>
+                              <input type="text" placeholder="(contoh: celana)" value={outfit.miftah?.botText || ''} onChange={(e) => handleOutfitChange({...outfit, miftah: {...outfit.miftah, botText: e.target.value}})} className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-300"/>
+                           </div>
+                        </div>
+                        <div className="self-center bg-rose-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg z-10 font-bold text-xl my-4 md:my-0"><Plus size={24}/></div>
+                        <div className="bg-white/80 p-8 rounded-[2rem] shadow-xl w-full max-w-xs">
+                           <h3 className="font-bold text-pink-900 text-xl mb-6">Tanzil</h3>
+                           <div className="space-y-4">
+                              <div className="flex items-center gap-4"><span className="text-xs font-bold w-16">Atasan</span><div className="h-10 flex-1 rounded-xl shadow-inner border border-gray-200" style={{backgroundColor: outfit.tanzil?.top || '#FFF'}}></div>{!outfit.locked && <input type="color" value={outfit.tanzil?.top || '#FFFFFF'} onChange={(e) => handleOutfitChange({...outfit, tanzil: {...outfit.tanzil, top: e.target.value}})} />}</div>
+                              <input type="text" placeholder="(contoh: dress)" value={outfit.tanzil?.topText || ''} onChange={(e) => handleOutfitChange({...outfit, tanzil: {...outfit.tanzil, topText: e.target.value}})} className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-300"/>
+                              <div className="flex items-center gap-4"><span className="text-xs font-bold w-16">Bawahan</span><div className="h-10 flex-1 rounded-xl shadow-inner border border-gray-200" style={{backgroundColor: outfit.tanzil?.bot || '#000'}}></div>{!outfit.locked && <input type="color" value={outfit.tanzil?.bot || '#000000'} onChange={(e) => handleOutfitChange({...outfit, tanzil: {...outfit.tanzil, bot: e.target.value}})} />}</div>
+                              <input type="text" placeholder="(contoh: rok)" value={outfit.tanzil?.botText || ''} onChange={(e) => handleOutfitChange({...outfit, tanzil: {...outfit.tanzil, botText: e.target.value}})} className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-pink-300"/>
+                           </div>
+                        </div>
+                     </div>
+                     <button onClick={() => handleOutfitChange({...outfit, locked: !outfit.locked})} className={`px-8 py-4 rounded-full font-bold shadow-lg transition-transform active:scale-95 ${outfit.locked ? 'bg-gray-800 text-white' : 'bg-rose-500 text-white'}`}>{outfit.locked ? <span className="flex items-center gap-2"><Lock size={18}/> Sudah Disepakati</span> : <span className="flex items-center gap-2"><Unlock size={18}/> Kunci Pilihan</span>}</button>
+                  </div>
+                )}
 
         {activeTab === 'pms' && (
           <div className="max-w-xl mx-auto py-10 animate-fade-in text-center">
@@ -618,11 +675,11 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                  <div className={`p-8 rounded-[2rem] relative overflow-hidden transition-all ${capsuleEmip.isLocked ? 'bg-[#f0f4f8] border-2 border-dashed border-blue-200' : 'bg-white shadow-xl border border-white'}`}>
                     <div className="absolute top-0 left-0 w-full h-2 bg-blue-200"></div><div className="flex items-center gap-4 mb-6"><div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500"><User size={20}/></div><h3 className="text-xl font-bold text-blue-900 font-serif">Untuk Emip</h3></div>
-                    {!capsuleEmip.isLocked ? (<div className="space-y-4"><textarea value={capsuleEmip.msg} onChange={e => setCapsuleEmip({...capsuleEmip, msg: e.target.value})} placeholder="Tulis surat rahasia..." className="w-full p-4 bg-gray-50 rounded-2xl border-0 h-40 resize-none focus:ring-2 focus:ring-blue-200 font-serif italic text-gray-600 leading-loose" /><input type="date" value={capsuleEmip.date} onChange={e => setCapsuleEmip({...capsuleEmip, date: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 text-sm" /><button onClick={() => {if(capsuleEmip.msg && capsuleEmip.date) setCapsuleEmip({...capsuleEmip, isLocked: true})}} className="w-full bg-blue-500 text-white py-3 rounded-xl font-bold hover:bg-blue-600 shadow-md">Segel Surat 💌</button></div>) : (<div className="text-center py-12 bg-white/50 rounded-2xl border border-blue-100"><Lock size={48} className="mx-auto text-blue-300 mb-4 animate-bounce"/><p className="font-bold text-blue-800 text-lg">Surat Tersegel</p><p className="text-xs text-blue-600 mt-2 font-mono">Dapat dibuka: {new Date(capsuleEmip.date).toLocaleDateString()}</p></div>)}
+                    {!capsuleEmip.isLocked ? (<div className="space-y-4"><textarea value={capsuleEmip.msg} onChange={e => setCapsuleEmip({...capsuleEmip, msg: e.target.value})} placeholder="Tulis surat rahasia..." className="w-full p-4 bg-gray-50 rounded-2xl border-0 h-40 resize-none focus:ring-2 focus:ring-blue-200 font-serif italic text-gray-600 leading-loose" /><input type="date" value={capsuleEmip.date} onChange={e => setCapsuleEmip({...capsuleEmip, date: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 text-sm" /><button onClick={() => {if(capsuleEmip.msg && capsuleEmip.date) updateCapsule('emip', {...capsuleEmip, isLocked: true})}} className="w-full bg-blue-500 text-white py-3 rounded-xl font-bold hover:bg-blue-600 shadow-md">Segel Surat 💌</button></div>) : (<div className="text-center py-12 bg-white/50 rounded-2xl border border-blue-100"><Lock size={48} className="mx-auto text-blue-300 mb-4 animate-bounce"/><p className="font-bold text-blue-800 text-lg">Surat Tersegel</p><p className="text-xs text-blue-600 mt-2 font-mono">Dapat dibuka: {capsuleEmip.date ? new Date(capsuleEmip.date).toLocaleDateString() : 'Tanggal Belum Ditetapkan'}</p></div>)}
                  </div>
                  <div className={`p-8 rounded-[2rem] relative overflow-hidden transition-all ${capsuleAzil.isLocked ? 'bg-[#fff8e1] border-2 border-dashed border-amber-200' : 'bg-white shadow-xl border border-white'}`}>
                     <div className="absolute top-0 left-0 w-full h-2 bg-amber-200"></div><div className="flex items-center gap-4 mb-6"><div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-500"><User size={20}/></div><h3 className="text-xl font-bold text-amber-900 font-serif">Untuk Azil</h3></div>
-                    {!capsuleAzil.isLocked ? (<div className="space-y-4"><textarea value={capsuleAzil.msg} onChange={e => setCapsuleAzil({...capsuleAzil, msg: e.target.value})} placeholder="Tulis surat rahasia..." className="w-full p-4 bg-gray-50 rounded-2xl border-0 h-40 resize-none focus:ring-2 focus:ring-amber-200 font-serif italic text-gray-600 leading-loose" /><input type="date" value={capsuleAzil.date} onChange={e => setCapsuleAzil({...capsuleAzil, date: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 text-sm" /><button onClick={() => {if(capsuleAzil.msg && capsuleAzil.date) setCapsuleAzil({...capsuleAzil, isLocked: true})}} className="w-full bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 shadow-md">Segel Surat 💌</button></div>) : (<div className="text-center py-12 bg-white/50 rounded-2xl border border-amber-100"><Lock size={48} className="mx-auto text-amber-300 mb-4 animate-bounce"/><p className="font-bold text-amber-800 text-lg">Surat Tersegel</p><p className="text-xs text-amber-600 mt-2 font-mono">Dapat dibuka: {new Date(capsuleAzil.date).toLocaleDateString()}</p></div>)}
+                    {!capsuleAzil.isLocked ? (<div className="space-y-4"><textarea value={capsuleAzil.msg} onChange={e => setCapsuleAzil({...capsuleAzil, msg: e.target.value})} placeholder="Tulis surat rahasia..." className="w-full p-4 bg-gray-50 rounded-2xl border-0 h-40 resize-none focus:ring-2 focus:ring-amber-200 font-serif italic text-gray-600 leading-loose" /><input type="date" value={capsuleAzil.date} onChange={e => setCapsuleAzil({...capsuleAzil, date: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-0 text-sm" /><button onClick={() => {if(capsuleAzil.msg && capsuleAzil.date) updateCapsule('azil', {...capsuleAzil, isLocked: true})}} className="w-full bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 shadow-md">Segel Surat 💌</button></div>) : (<div className="text-center py-12 bg-white/50 rounded-2xl border border-amber-100"><Lock size={48} className="mx-auto text-amber-300 mb-4 animate-bounce"/><p className="font-bold text-amber-800 text-lg">Surat Tersegel</p><p className="text-xs text-amber-600 mt-2 font-mono">Dapat dibuka: {capsuleAzil.date ? new Date(capsuleAzil.date).toLocaleDateString() : 'Tanggal Belum Ditetapkan'}</p></div>)}
                  </div>
               </div>
            </div>
@@ -643,6 +700,53 @@ export default function App() {
                  ))}
                  <button onClick={() => {const t = prompt("Nama Voucher Baru:"); if(t) setVouchers(prev => [...prev, {id: Date.now(), title: t, used:false}])}} className="border-2 border-dashed border-gray-300 rounded-[2rem] flex items-center justify-center p-8 text-gray-400 hover:bg-white hover:border-rose-300 hover:text-rose-400 transition-all gap-2 bg-white/30"><Plus size={20}/> Buat Voucher Sendiri</button>
               </div>
+           </div>
+        )}
+        {activeTab === 'timer' && (
+            <div className="min-h-[80vh] flex flex-col items-center justify-center relative animate-fade-in overflow-hidden">
+                <div className="firework" style={{top: '20%', left: '20%', animationDelay: '0.2s'}}></div><div className="firework" style={{top: '30%', left: '80%', animationDelay: '0.5s'}}></div><div className="firework" style={{top: '70%', left: '40%', animationDelay: '1.2s'}}></div><div className="firework" style={{top: '50%', left: '90%', animationDelay: '0.8s'}}></div>
+                <div className="text-center z-10 p-8 bg-white/20 backdrop-blur-lg rounded-[3rem] border border-white/30 shadow-2xl max-w-4xl mx-auto">
+                    <Heart size={64} className="text-rose-500 fill-rose-500 mx-auto mb-6 animate-pulse" />
+                    <h2 className="text-2xl md:text-3xl font-serif text-rose-900 mb-8 font-light italic">We have been together for:</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-10">
+                        {[{ val: timerText.years, label: 'Years' }, { val: timerText.months, label: 'Months' }, { val: timerText.days, label: 'Days' }, { val: timerText.hours, label: 'Hours' }, { val: timerText.minutes, label: 'Menit' }, { val: timerText.seconds, label: 'Second' }].map((t, i) => (<div key={i} className="flex flex-col items-center"><span className="text-4xl md:text-7xl font-bold text-rose-600 drop-shadow-sm font-serif">{t.val}</span><span className="text-xs md:text-sm font-bold uppercase tracking-[0.3em] text-rose-800/60 mt-2">{t.label}</span></div>))}
+                    </div>
+                    <p className="mt-10 text-rose-900/50 text-sm font-medium">Started from 17 Oktober 2025</p>
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'deeptalk' && (
+           <div className="max-w-md mx-auto min-h-[70vh] flex flex-col items-center justify-center animate-fade-in">
+              {questions.length > 0 ? (
+                <>
+                  <div className={`w-full h-96 relative cursor-default perspective-1000 group ${isShuffling ? 'animate-shake' : ''}`}>
+                     <div className={`relative w-full h-full transition-transform duration-700 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                        <div className="absolute w-full h-full bg-gradient-to-br from-rose-400 to-pink-500 rounded-[2.5rem] shadow-2xl shadow-rose-200/50 flex flex-col items-center justify-center p-8 text-white backface-hidden border-[8px] border-white">
+                           <MessageCircleHeart size={80} className="mb-6 opacity-90" />
+                           <h3 className="text-4xl font-serif font-bold tracking-wide">Deep Talk</h3>
+                           <p className="mt-4 uppercase tracking-[0.2em] text-xs font-bold bg-white/20 px-6 py-2 rounded-full">Kocok Untuk Membuka</p>
+                        </div>
+                        <div className="absolute w-full h-full bg-white rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-center p-10 text-center rotate-y-180 backface-hidden border border-rose-50 relative">
+                           <Star size={32} className="text-yellow-400 mb-6 fill-yellow-400"/>
+                           <p className="text-2xl font-serif text-rose-950 leading-relaxed font-medium">"{questions[currentQIndex]}"</p>
+                           <div className="absolute bottom-8 flex gap-4 text-gray-300">
+                              <button onClick={(e) => {e.stopPropagation(); handleDeleteQuestion()}} className="hover:text-red-400 transition-colors p-2 rounded-full hover:bg-red-50"><Trash2 size={20}/></button>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+                  <div className="mt-12 flex gap-4 w-full">
+                     <button onClick={handleNextQuestion} className="flex-1 flex items-center justify-center gap-2 bg-white text-rose-600 border border-white px-6 py-4 rounded-[2rem] font-bold shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"><Shuffle size={18} /> Kocok Kartu</button>
+                     <button onClick={handleAddQuestion} className="w-16 h-14 bg-rose-500 text-white rounded-[2rem] flex items-center justify-center shadow-lg hover:bg-rose-600 transition-colors"><Plus size={24}/></button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center p-10">
+                   <div className="animate-spin mb-4 text-rose-500"><Sparkles size={32}/></div>
+                   <p className="text-rose-800 font-medium">Menyiapkan kartu pertanyaan...</p>
+                </div>
+              )}
            </div>
         )}
 
