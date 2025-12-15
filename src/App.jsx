@@ -74,18 +74,11 @@ const features = [
 
 // --- COMPONENTS ---
 
-// 1. Navigation Drawer (FIX: Sticky Note dengan Tombol Kirim)
+// 1. Navigation Drawer (FIX: Sticky Note kembali ke Local Storage)
 const NavDrawer = ({ isOpen, onClose, activeTab, setActiveTab, stickyNote, setStickyNote, progress, triggerAnnoyance }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false); 
-  // State lokal untuk sticky note agar ngetik tidak lag
-  const [localNote, setLocalNote] = useState(stickyNote);
   
-  // Sinkronisasi data lokal jika ada update baru dari pasangan (Database)
-  useEffect(() => {
-    setLocalNote(stickyNote);
-  }, [stickyNote]);
-
   // Audio Ref
   const audioRef = useRef(new Audio('music-jazz.MP3')); 
 
@@ -100,11 +93,6 @@ const NavDrawer = ({ isOpen, onClose, activeTab, setActiveTab, stickyNote, setSt
       }
     }
     setIsPlaying(!isPlaying);
-  };
-
-  const handleSendNote = () => {
-    setStickyNote(localNote); // Kirim ke Firebase
-    alert("Pesan terkirim ke pasangan! ❤️");
   };
 
   const currentFeatureLabel = features.find(f => f.id === activeTab)?.label || "Menu Fitur";
@@ -135,23 +123,20 @@ const NavDrawer = ({ isOpen, onClose, activeTab, setActiveTab, stickyNote, setSt
                   </div>
                </div>
                
-               {/* FIX: Sticky Note dengan Tombol Kirim */}
+               {/* STICKY NOTE LAMA (LOCAL STORAGE MODE) */}
                <div className="bg-[#fff9c4] p-5 rounded-2xl shadow-sm relative transform rotate-1 hover:rotate-0 transition-transform duration-300 border border-[#fff59d]">
                   <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-xs font-bold text-yellow-800 uppercase flex items-center gap-2"><Sparkles size={12}/> Mood Check-in</h4>
-                    <button onClick={handleSendNote} className="bg-yellow-600 text-white p-1.5 rounded-full hover:bg-yellow-700 transition-colors" title="Kirim ke Pasangan">
-                      <Send size={12} />
-                    </button>
+                    <h4 className="text-xs font-bold text-yellow-800 uppercase flex items-center gap-2"><Sparkles size={12}/> Catatanmu!</h4>
                   </div>
                   <textarea 
-                    value={localNote} 
-                    onChange={(e) => setLocalNote(e.target.value)} 
+                    value={stickyNote} 
+                    onChange={setStickyNote} // Langsung panggil setter dari App()
                     className="w-full bg-transparent text-sm text-gray-700 font-medium resize-none focus:outline-none leading-relaxed" 
                     rows="3" 
                     placeholder="Tulis pesan manis..." 
                     style={{ fontFamily: 'cursive' }} 
                   />
-                  <p className="text-[10px] text-yellow-700/60 text-right mt-1">*Klik ikon pesawat untuk update</p>
+                  <p className="text-[10px] text-yellow-700/60 text-right mt-1">*Disimpan di HP ini saja</p>
                </div>
             </div>
             <div className="mt-6 border-t border-rose-100 pt-4 relative">
@@ -183,7 +168,7 @@ const HelpModal = ({ isOpen, onClose, activeTab }) => {
     capsule: { title: "Pesan Masa Depan", text: "Tulis surat di sini, terus kunci. Kita buka bareng-bareng nanti pas tanggalnya tiba. Inget, gak boleh diintip kuncinya!" },
     tickets: { title: "Hadiah Cintaku", text: "Tiap 3 date selesai, kamu dapet 1 Tiket Qpon, ehh engga deh tapi tiket ini bisa ditukerin sama voucher yg ga kalah menarikk" },
     outfit: { title: "Cocoklogi Baju", text: "Bingung mau pake baju warna apa? Pilih warna di sini pakai color picker yang bulet itu biar kita match! Tulis juga jenisnya (kemeja/gamis) biar makin jelas. Kalau udah sepakat, klik kunci ya." },
-    pms: { title: "Sistem Peringatan Dini", text: "Fitur penyelamat nyawa! Set tanggal mulai dan akhir haid kamu di sini. Nanti kalender bakal merah dan ada running text di atas kalau masuk zona bahaya, biar aku siap mentall :D." }
+    pms: { title: "Sistem Peringatan Dini", text: "Fitur penyelamat nyawa! Set tanggal mulai dan akhir haid kamu di sini. Nanti kalender bakal merah dan ada running text di atas kalau masuk zona bahaya, biar aku siap mentall." }
   };
   const currentHelp = content[activeTab] || content['journey'];
   return (
@@ -254,6 +239,7 @@ export default function App() {
   // const [capsuleEmip, setCapsuleEmip] = useState(() => { const s = localStorage.getItem('capsule-emip'); return s ? JSON.parse(s) : { msg: '', date: '', isLocked: false }; });
   // const [capsuleAzil, setCapsuleAzil] = useState(() => { const s = localStorage.getItem('capsule-azil'); return s ? JSON.parse(s) : { msg: '', date: '', isLocked: false }; });
 
+  
   // SYNC LOCALSTORAGE
   useEffect(() => {
      localStorage.setItem('mt-outfit-v5', JSON.stringify(outfit));
@@ -278,7 +264,7 @@ export default function App() {
         }
     });
 
-    // 2. Sync Questions
+      // 2. Sync Questions
     const unsubQuestions = onSnapshot(collection(db, "questions"), (snapshot) => {
         if(snapshot.empty) {
             const batch = writeBatch(db);
@@ -302,28 +288,37 @@ export default function App() {
 
     // 4. Sync Global App State
     // 4. Sync Global App State
+    // 4. Sync Global App State
+    // 4. Sync Global App State (PMS FIX INCLUDED)
     const unsubAppState = onSnapshot(doc(db, "global", "state"), (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             setAppState(data);
             
-            // JIKA FIREBASE BILANG "ANNOYANCE NYALA":
+            // FIX OUTFIT: Langsung set state lokal OUTFIT
+            if (data.outfit) setOutfit(data.outfit);
+
+            // <<< PERBAIKAN UNTUK PMS SYSTEM >>>
+            // Saat data global di Firebase berubah, set state pmsData lokal 
+            // di kedua HP secara real-time.
+            if (data.pms) setPmsData(data.pms); 
+            // ------------------------------------
+            
             if (data.annoyanceTriggered) {
                 setAnnoyanceActive(true);
-
-                // --- TAMBAHAN BARU: FITUR GETAR (VIBRATE) ---
-                // Pola getar: 500ms getar, 200ms diam, 500ms getar
-                if (navigator.vibrate) {
-                    navigator.vibrate([500, 200, 500]); 
-                }
-                // -------------------------------------------
-
+                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([500, 200, 500]);
                 setTimeout(() => {
                     setAnnoyanceActive(false);
-                    // Reset status di database biar bisa diklik lagi nanti
                     updateDoc(doc(db, "global", "state"), { annoyanceTriggered: false }); 
                 }, 1500); 
             }
+        } else {
+             // Inisialisasi dokumen jika belum ada di Firebase
+             setDoc(doc(db, "global", "state"), { 
+                 annoyanceTriggered: false,
+                 outfit: outfit, 
+                 pms: pmsData // Menggunakan state PMS lokal sebagai default saat inisialisasi
+             }, { merge: true }); 
         }
     });
 
@@ -354,7 +349,10 @@ export default function App() {
   };
 
   const handleOutfitChange = (newOutfit) => {
+      // 1. Update state lokal untuk responsivitas (pilihan warna/teks)
       setOutfit(newOutfit);
+      
+      // 2. Update Firebase
       updateFirebaseState('outfit', newOutfit);
   };
 
@@ -363,9 +361,10 @@ export default function App() {
       updateFirebaseState('pms', newPms);
   };
 
-  const handleStickyChange = (val) => {
-      setStickyNoteState(val);
-      updateFirebaseState('stickyNote', val);
+  const handleStickyChange = (e) => {
+      // Langsung simpan di state lokal (tidak perlu tombol kirim)
+      setStickyNoteState(e.target.value); 
+      localStorage.setItem('mt-sticky', e.target.value); // Simpan ke LocalStorage
   };
 
   const updateCapsule = async (target, data) => {
@@ -653,13 +652,41 @@ export default function App() {
                 <div className="flex justify-center mb-6"><div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center text-rose-500 animate-bounce-slow"><Droplet size={40} fill="currentColor" /></div></div>
                 <h2 className="text-3xl font-serif font-bold text-rose-950 mb-2">PMS Warning System</h2>
                 <p className="text-gray-500 text-sm mb-8">Pantau tanggal merah agar dunia tetap damai.</p>
+                
                 <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-inner mb-8">
                    <h4 className="text-center font-bold text-gray-800 mb-4">{new Date().toLocaleString('id-ID', { month: 'long', year: 'numeric' })}</h4>
                    {renderCalendar()}
                 </div>
+                
                 <div className="space-y-4 text-left bg-rose-50/50 p-6 rounded-3xl border border-rose-100">
-                   <div><label className="block text-xs font-bold text-rose-400 uppercase mb-2 ml-1">Mulai Periode</label><input type="date" value={pmsData.startDate || ''} onChange={e => handlePmsChange({...pmsData, startDate: e.target.value})} className="w-full p-3 bg-white rounded-xl border border-rose-100 focus:ring-2 focus:ring-rose-300" /></div>
-                   <div><label className="block text-xs font-bold text-rose-400 uppercase mb-2 ml-1">Selesai Periode</label><input type="date" value={pmsData.endDate || ''} onChange={e => handlePmsChange({...pmsData, endDate: e.target.value})} className="w-full p-3 bg-white rounded-xl border border-rose-100 focus:ring-2 focus:ring-rose-300" /></div>
+                   <div>
+                      <label className="block text-xs font-bold text-rose-400 uppercase mb-2 ml-1">Mulai Periode</label>
+                      <input 
+                        type="date" 
+                        value={pmsData.startDate || ''} 
+                        onChange={e => handlePmsChange({...pmsData, startDate: e.target.value})} 
+                        className="w-full p-3 bg-white rounded-xl border border-rose-100 focus:ring-2 focus:ring-rose-300 outline-none" 
+                      />
+                   </div>
+                   <div>
+                      <label className="block text-xs font-bold text-rose-400 uppercase mb-2 ml-1">Selesai Periode</label>
+                      <input 
+                        type="date" 
+                        value={pmsData.endDate || ''} 
+                        onChange={e => handlePmsChange({...pmsData, endDate: e.target.value})} 
+                        className="w-full p-3 bg-white rounded-xl border border-rose-100 focus:ring-2 focus:ring-rose-300 outline-none" 
+                      />
+                   </div>
+                   {/* TOMBOL BARU: SET JADWAL */}
+                   <div className="pt-4 text-center">
+                      <button 
+                         onClick={() => handlePmsChange(pmsData)} 
+                         disabled={!pmsData.startDate || !pmsData.endDate}
+                         className="px-6 py-3 bg-rose-600 text-white font-bold rounded-xl shadow-md hover:bg-rose-700 transition-colors disabled:bg-gray-400"
+                      >
+                          Set Jadwal Realtime
+                      </button>
+                   </div>
                 </div>
              </div>
           </div>
